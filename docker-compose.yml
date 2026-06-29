@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  ui-db:
+    build: .
+    container_name: ui-db
+    ports:
+      - "7924:7924"
+    volumes:
+      # Монтируем src/ чтобы редактировать файлы снаружи
+      - ./src:/app/src
+      - ./serve.js:/app/serve.js
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped

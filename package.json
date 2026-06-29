@@ -1,0 +1,18 @@
+{
+  "name": "ui-db",
+  "version": "1.0.0",
+  "description": "DBML Editor & Schema Visualizer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "codemirror": "^5.65.18"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
