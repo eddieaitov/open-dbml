@@ -96,6 +96,7 @@ html, body {
   -webkit-app-region: no-drag;
   font-size: 11px;
   color: var(--text-muted);
+  margin-top: 3px;
 }
 .autosave-toggle input[type="checkbox"] {
   appearance: none;
