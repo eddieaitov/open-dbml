@@ -19,6 +19,13 @@ const state = {
   autosaveTimer: null,
 };
 
+// ── Zoom & Pan state ──────────────────────────────────────────────
+let schemaZoom = 1;
+let schemaPanX = 0;
+let schemaPanY = 0;
+let isPanning = false;
+let panStartX, panStartY, panStartPanX, panStartPanY;
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  DOM REFS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +49,7 @@ const dom = {
   btnSaveAs:    $('#btn-saveas'),
   btnArrange:   $('#btn-arrange'),
   chkAutosave:  $('#chk-autosave'),
+  zoomIndicator: $('#zoom-indicator'),
   editorPanel:  $('#editor-panel'),
   schemaPanel:  $('#schema-panel'),
 };
@@ -449,7 +457,7 @@ function createTableCard(table) {
   const header = document.createElement('div');
   header.className = 'table-header';
   const color = getTableColor(table.name);
-  header.style.background = `linear-gradient(135deg, ${color}, ${darkenColor(color)})`;
+  header.style.background = color;
   header.innerHTML = `<span class="table-name">${escapeHtml(table.name)}</span>`;
 
   // Color swatch
@@ -629,12 +637,12 @@ function drawConnections(refs, elements) {
     const toAnchor   = getEdgeAnchor(toRect, fromCenter);
 
     const relFrom = {
-      x: fromAnchor.x - canvasRect.left,
-      y: fromAnchor.y - canvasRect.top,
+      x: (fromAnchor.x - canvasRect.left - schemaPanX) / schemaZoom,
+      y: (fromAnchor.y - canvasRect.top - schemaPanY) / schemaZoom,
     };
     const relTo = {
-      x: toAnchor.x - canvasRect.left,
-      y: toAnchor.y - canvasRect.top,
+      x: (toAnchor.x - canvasRect.left - schemaPanX) / schemaZoom,
+      y: (toAnchor.y - canvasRect.top - schemaPanY) / schemaZoom,
     };
 
     // SVG viewBox is the same as container size — use relative coords
@@ -823,6 +831,75 @@ document.addEventListener('mouseup', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ZOOM & PAN  (schema canvas)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function applySchemaTransform() {
+  const t = `translate(${schemaPanX}px, ${schemaPanY}px) scale(${schemaZoom})`;
+  dom.tablesContainer.style.transform = t;
+  dom.connectionsSvg.style.transform = t;
+  updateZoomIndicator();
+}
+
+function updateZoomIndicator() {
+  const pct = Math.round(schemaZoom * 100);
+  dom.zoomIndicator.textContent = `${pct}%`;
+  dom.zoomIndicator.classList.toggle('hidden', pct === 100 && schemaPanX === 0 && schemaPanY === 0);
+}
+
+// Zoom with mouse wheel
+dom.schemaCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = dom.schemaCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const oldZoom = schemaZoom;
+  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+  schemaZoom = Math.max(0.2, Math.min(3, schemaZoom + delta));
+
+  // Zoom toward cursor: keep the point under the mouse stable
+  const localX = (mx - schemaPanX) / oldZoom;
+  const localY = (my - schemaPanY) / oldZoom;
+  schemaPanX = mx - localX * schemaZoom;
+  schemaPanY = my - localY * schemaZoom;
+
+  applySchemaTransform();
+  updateConnections();
+}, { passive: false });
+
+// Pan by dragging empty canvas area
+dom.schemaCanvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  // Don't start pan if clicking a table card or color popup
+  if (e.target.closest('.table-card') || e.target.closest('.color-popup')) return;
+  // Don't start pan from the panel header (above the canvas)
+  if (!dom.schemaCanvas.contains(e.target)) return;
+
+  isPanning = true;
+  dom.schemaCanvas.classList.add('grabbing');
+  panStartX = e.clientX;
+  panStartY = e.clientY;
+  panStartPanX = schemaPanX;
+  panStartPanY = schemaPanY;
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  schemaPanX = panStartPanX + (e.clientX - panStartX);
+  schemaPanY = panStartPanY + (e.clientY - panStartY);
+  applySchemaTransform();
+});
+
+document.addEventListener('mouseup', () => {
+  if (!isPanning) return;
+  isPanning = false;
+  dom.schemaCanvas.classList.remove('grabbing');
+  // Redraw connections after pan settles
+  updateConnections();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  UTILITY
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -857,7 +934,7 @@ function showColorPopup(anchor, tableName, headerEl) {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       setTableColor(tableName, c);
-      headerEl.style.background = `linear-gradient(135deg, ${c}, ${darkenColor(c)})`;
+      headerEl.style.background = c;
       anchor.style.background = c;
       document.querySelector('.color-popup')?.remove();
     });
@@ -921,10 +998,7 @@ window.addEventListener('beforeunload', (e) => {
   }
 });
 
-// Re-draw connections on canvas scroll
-dom.schemaCanvas.addEventListener('scroll', () => {
-  updateConnections();
-});
+// Connections redrawn automatically after zoom/pan transforms
 
 // Re-draw connections on resize
 window.addEventListener('resize', () => {
