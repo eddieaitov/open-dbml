@@ -799,6 +799,31 @@ function autoArrange() {
 function parseAndRender() {
   const text = editor.getValue();
   const result = parseDBML(text);
+
+  // ── Migrate positions for renamed tables ─────────────────────────
+  if (result.errors.length === 0) {
+    const oldTables = state.tables;
+    const newTables = result.tables;
+    // Build fingerprint map from old tables
+    const oldByFingerprint = {};
+    for (const [name, t] of Object.entries(oldTables)) {
+      const fp = tableFingerprint(t);
+      oldByFingerprint[fp] = name;
+    }
+    // For each new table without a saved position, look up by fingerprint
+    for (const [newName, t] of Object.entries(newTables)) {
+      if (state.positions[newName]) continue; // already has a saved position
+      const fp = tableFingerprint(t);
+      const oldName = oldByFingerprint[fp];
+      if (oldName && oldName !== newName && state.positions[oldName]) {
+        // Migrate position + color from old name to new name
+        state.positions[newName] = state.positions[oldName];
+        delete state.positions[oldName];
+        savePositions();
+      }
+    }
+  }
+
   state.tables = result.tables;
   state.refs = result.refs;
 
@@ -974,6 +999,12 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function tableFingerprint(table) {
+  return table.columns.map(c =>
+    `${c.name}:${c.type}:${c.pk ? 'PK':''}:${c.ref ? c.ref.table+'.'+c.ref.column : ''}`
+  ).join('|');
 }
 
 function darkenColor(hex) {

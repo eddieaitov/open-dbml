@@ -3,11 +3,18 @@
   "version": "1.0.0",
   "description": "DBML Editor & Schema Visualizer",
   "main": "main.js",
+  "author": "ui-db",
+  "license": "MIT",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "npx @electron/packager . ui-db --platform=darwin --arch=arm64 --icon=build/icon.icns --out=release --overwrite --app-bundle-id=com.ui-db.app --app-version=1.0.0 --ignore='node_modules/electron' --ignore='node_modules/electron-builder' --ignore='node_modules/@electron' --ignore='release' --ignore='.git' --ignore='node_modules/.cache'",
+    "build": "npm run pack && cp build/icon.icns release/ui-db-darwin-arm64/ui-db.app/Contents/Resources/electron.icns",
+    "dmg": "npm run build && node scripts/make-dmg.js"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.3",
+    "@electron/packager": "^18.3.6"
   },
   "dependencies": {
     "codemirror": "^5.65.18"

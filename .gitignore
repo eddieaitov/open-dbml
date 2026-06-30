@@ -8,6 +8,9 @@ out/
 dist/
 build/
 
+# Release (electron-packager output)
+release/
+
 # Environment
 .env
 .env.local
