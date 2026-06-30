@@ -33,3 +33,6 @@ electron-builder.yml
 
 # Positions data (user-specific, generated at runtime)
 *.positions.json
+
+# App state (last file, recent files)
+.ui-db-state.json

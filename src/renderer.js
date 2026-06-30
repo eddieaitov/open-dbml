@@ -44,6 +44,8 @@ const dom = {
   emptyMsg:     $('#empty-schema-msg'),
   resizeHandle: $('#resize-handle'),
   btnNew:       $('#btn-new'),
+  btnRecent:    $('#btn-recent'),
+  recentDropdown: $('#recent-dropdown'),
   btnOpen:      $('#btn-open'),
   btnSave:      $('#btn-save'),
   btnSaveAs:    $('#btn-saveas'),
@@ -146,6 +148,10 @@ function loadFile(filePath, content) {
   updateTitle();
   loadPositions();
   parseAndRender();
+  if (!isWeb && filePath) {
+    updateLastFile(filePath);
+    addRecentFile(filePath);
+  }
 }
 
 function updateTitle() {
@@ -216,13 +222,74 @@ function getSavedPosition(tableName) {
 }
 
 function setSavedPosition(tableName, x, y) {
-  state.positions[tableName] = { x, y };
+  const existing = state.positions[tableName] || {};
+  state.positions[tableName] = { ...existing, x, y };
   savePositions();
 }
 
 function removeSavedPosition(tableName) {
   delete state.positions[tableName];
   savePositions();
+}
+
+// ── App State (last file, recent files) ────────────────────────────
+const APP_STATE_FILE = '.ui-db-state.json';
+
+function appStatePath() {
+  if (isWeb) return null;
+  return pathMod.resolve(__dirname, '..', APP_STATE_FILE);
+}
+
+function loadAppState() {
+  if (isWeb) {
+    try { return JSON.parse(localStorage.getItem('ui-db-state') || '{}'); } catch { return {}; }
+  }
+  const fp = appStatePath();
+  try { if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf-8')); } catch {}
+  return {};
+}
+
+function saveAppState(data) {
+  if (isWeb) {
+    try { localStorage.setItem('ui-db-state', JSON.stringify(data)); } catch {}
+    return;
+  }
+  const fp = appStatePath();
+  try { fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf-8'); } catch {}
+}
+
+function updateLastFile(filePath) {
+  if (!filePath) return;
+  const st = loadAppState();
+  st.lastFile = filePath;
+  saveAppState(st);
+}
+
+function addRecentFile(filePath) {
+  if (!filePath || isWeb) return;
+  const st = loadAppState();
+  if (!st.recentFiles) st.recentFiles = [];
+  // Remove duplicate
+  st.recentFiles = st.recentFiles.filter(f => f !== filePath);
+  // Add to front
+  st.recentFiles.unshift(filePath);
+  // Keep max 10
+  if (st.recentFiles.length > 10) st.recentFiles.length = 10;
+  saveAppState(st);
+  renderRecentMenu();
+}
+
+function renderRecentMenu() {
+  const menu = dom.recentDropdown;
+  const st = loadAppState();
+  const files = st.recentFiles || [];
+  if (files.length === 0) {
+    menu.innerHTML = '<div class="recent-empty">No recent files</div>';
+    return;
+  }
+  menu.innerHTML = files.map(f =>
+    `<div class="recent-item" data-path="${escapeHtml(f)}">${escapeHtml(pathMod.basename(f))}<span class="recent-path">${escapeHtml(f)}</span></div>`
+  ).join('');
 }
 
 function getTableColor(tableName) {
@@ -855,7 +922,7 @@ dom.schemaCanvas.addEventListener('wheel', (e) => {
   const my = e.clientY - rect.top;
 
   const oldZoom = schemaZoom;
-  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
   schemaZoom = Math.max(0.2, Math.min(3, schemaZoom + delta));
 
   // Zoom toward cursor: keep the point under the mouse stable
@@ -960,6 +1027,41 @@ function showColorPopup(anchor, tableName, headerEl) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 dom.btnNew.addEventListener('click', newFile);
+
+// Recent files dropdown
+function toggleRecentDropdown() {
+  renderRecentMenu();
+  dom.recentDropdown.classList.toggle('hidden');
+}
+dom.btnRecent.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleRecentDropdown();
+});
+dom.recentDropdown.addEventListener('click', (e) => {
+  const item = e.target.closest('.recent-item');
+  if (!item) return;
+  const fp = item.dataset.path;
+  if (!fp) return;
+  dom.recentDropdown.classList.add('hidden');
+  // If unsaved, ask
+  if (state.isDirty && !confirm('Discard unsaved changes and open this file?')) return;
+  // Open the recent file
+  if (isWeb) return;
+  try {
+    const content = fs.readFileSync(fp, 'utf-8');
+    loadFile(fp, content);
+  } catch (err) {
+    dom.statusBar.className = 'parse-err';
+    dom.statusBar.textContent = `✗ Failed to open: ${err.message}`;
+  }
+});
+// Close dropdown on click outside
+document.addEventListener('click', () => {
+  dom.recentDropdown.classList.add('hidden');
+});
+// Prevent click on button from closing (already stopped)
+// But allow re-opening by toggling
+
 dom.btnOpen.addEventListener('click', openFile);
 dom.btnSave.addEventListener('click', saveFile);
 dom.btnSaveAs.addEventListener('click', saveAsFile);
@@ -1047,3 +1149,19 @@ state.currentContent = DEFAULT_DBML;
 markClean();
 updateTitle();
 parseAndRender();
+
+// Auto-open last file (skip in web mode)
+if (!isWeb) {
+  const st = loadAppState();
+  if (st.lastFile) {
+    try {
+      if (fs.existsSync(st.lastFile)) {
+        const content = fs.readFileSync(st.lastFile, 'utf-8');
+        loadFile(st.lastFile, content);
+      }
+    } catch (_) { /* file may have been deleted */ }
+  }
+}
+
+// Hide Recent button in web mode
+if (isWeb && dom.btnRecent) dom.btnRecent.style.display = 'none';

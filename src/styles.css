@@ -488,3 +488,50 @@ html, body {
   color: var(--text-muted);
   line-height: 1.4;
 }
+
+/* ─── Recent files dropdown ─────────────────────────────────────── */
+.btn-recent { position: relative; }
+
+.recent-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 262px;
+  z-index: 500;
+  min-width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  padding: 4px 0;
+}
+.recent-dropdown.hidden { display: none; }
+
+.recent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background var(--transition);
+}
+.recent-item:hover { background: var(--bg-hover); }
+
+.recent-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
