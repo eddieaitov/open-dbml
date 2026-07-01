@@ -60,12 +60,13 @@ const dom = {
 //  FILE OPERATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-let ipcRenderer, fs, pathMod;
+let ipcRenderer, fs, pathMod, os;
 if (!isWeb) {
   const electron = require('electron');
   ipcRenderer = electron.ipcRenderer;
   fs = require('fs');
   pathMod = require('path');
+  os = require('os');
 }
 
 // ── Electron: file dialogs via IPC ─────────────────────────────────────
@@ -237,7 +238,9 @@ const APP_STATE_FILE = '.open-dbml-state.json';
 
 function appStatePath() {
   if (isWeb) return null;
-  return pathMod.resolve(__dirname, '..', APP_STATE_FILE);
+  // В собранном .app __dirname внутри .asar (read-only),
+  // поэтому пишем в домашнюю папку пользователя
+  return pathMod.join(os.homedir(), APP_STATE_FILE);
 }
 
 function loadAppState() {
@@ -267,29 +270,32 @@ function updateLastFile(filePath) {
 
 function addRecentFile(filePath) {
   if (!filePath || isWeb) return;
-  const st = loadAppState();
-  if (!st.recentFiles) st.recentFiles = [];
-  // Remove duplicate
-  st.recentFiles = st.recentFiles.filter(f => f !== filePath);
-  // Add to front
-  st.recentFiles.unshift(filePath);
-  // Keep max 10
-  if (st.recentFiles.length > 10) st.recentFiles.length = 10;
-  saveAppState(st);
-  renderRecentMenu();
+  try {
+    const st = loadAppState();
+    if (!st.recentFiles) st.recentFiles = [];
+    st.recentFiles = st.recentFiles.filter(f => f !== filePath);
+    st.recentFiles.unshift(filePath);
+    if (st.recentFiles.length > 10) st.recentFiles.length = 10;
+    saveAppState(st);
+    if (dom.recentDropdown) renderRecentMenu();
+  } catch (e) {
+    console.error('addRecentFile error:', e);
+  }
 }
 
 function renderRecentMenu() {
   const menu = dom.recentDropdown;
+  if (!menu) return;
   const st = loadAppState();
   const files = st.recentFiles || [];
   if (files.length === 0) {
     menu.innerHTML = '<div class="recent-empty">No recent files</div>';
     return;
   }
-  menu.innerHTML = files.map(f =>
-    `<div class="recent-item" data-path="${escapeHtml(f)}">${escapeHtml(pathMod.basename(f))}<span class="recent-path">${escapeHtml(f)}</span></div>`
-  ).join('');
+  menu.innerHTML = files.map(f => {
+    const display = isWeb ? f : (pathMod ? pathMod.basename(f) : f);
+    return `<div class="recent-item" data-path="${escapeHtml(f)}">${escapeHtml(display)}<span class="recent-path">${escapeHtml(f)}</span></div>`;
+  }).join('');
 }
 
 function getTableColor(tableName) {
@@ -1196,3 +1202,6 @@ if (!isWeb) {
 
 // Hide Recent button in web mode
 if (isWeb && dom.btnRecent) dom.btnRecent.style.display = 'none';
+
+// Initial render of recent menu
+renderRecentMenu();

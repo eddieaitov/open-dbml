@@ -45,6 +45,8 @@ Open DBML работает с файлами `.dbml` (Database Markup Language).
 
 Позиции и цвета таблиц сохраняются в файл `<имя>.dbml.positions.json` рядом с DBML-файлом.
 
+Последний открытый файл и список последних (recent) сохраняются в `~/.open-dbml-state.json`.
+
 ## Два режима запуска
 
 ### Electron (десктоп)
