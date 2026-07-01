@@ -202,9 +202,18 @@ function loadPositions() {
       }
     } catch (_) {}
   }
+  // Restore viewport from positions data
+  const vp = state.positions.__viewport__;
+  if (vp) {
+    schemaPanX = vp.x || 0;
+    schemaPanY = vp.y || 0;
+    schemaZoom = vp.z || 1;
+  }
 }
 
 function savePositions() {
+  // Save current viewport into positions data
+  state.positions.__viewport__ = { x: schemaPanX, y: schemaPanY, z: schemaZoom };
   if (isWeb) {
     try {
       localStorage.setItem('open-dbml-positions', JSON.stringify(state.positions));
@@ -555,6 +564,7 @@ function createTableCard(table) {
   for (const col of table.columns) {
     const row = document.createElement('div');
     row.className = 'table-col';
+    row.dataset.colName = col.name;
 
     const nameEl = document.createElement('span');
     nameEl.className = 'col-name';
@@ -687,27 +697,38 @@ function drawConnections(refs, elements) {
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const fromEl = elements[ref.from.table];
-    const toEl   = elements[ref.to.table];
-    if (!fromEl || !toEl) continue;
+    const fromCard = elements[ref.from.table];
+    const toCard   = elements[ref.to.table];
+    if (!fromCard || !toCard) continue;
 
-    const fromRect = fromEl.getBoundingClientRect();
-    const toRect   = toEl.getBoundingClientRect();
-
+    const fromRect = fromCard.getBoundingClientRect();
+    const toRect   = toCard.getBoundingClientRect();
     if (fromRect.width === 0 || toRect.width === 0) continue;
 
-    // Anchor points (centers of facing edges)
-    const fromCenter = {
-      x: fromRect.left + fromRect.width / 2,
-      y: fromRect.top + fromRect.height / 2,
-    };
-    const toCenter = {
-      x: toRect.left + toRect.width / 2,
-      y: toRect.top + toRect.height / 2,
-    };
+    // Find column elements to get per-column Y positions
+    const fromColEl = fromCard.querySelector(`[data-col-name="${CSS.escape(ref.from.column)}"]`);
+    const toColEl   = toCard.querySelector(`[data-col-name="${CSS.escape(ref.to.column)}"]`);
 
-    const fromAnchor = getEdgeAnchor(fromRect, toCenter);
-    const toAnchor   = getEdgeAnchor(toRect, fromCenter);
+    // Get Y center from column element, or fall back to table center
+    const fromColRect = fromColEl ? fromColEl.getBoundingClientRect() : null;
+    const toColRect   = toColEl ? toColEl.getBoundingClientRect() : null;
+
+    const fromY = fromColRect ? (fromColRect.top + fromColRect.bottom) / 2 : (fromRect.top + fromRect.bottom) / 2;
+    const toY   = toColRect ? (toColRect.top + toColRect.bottom) / 2 : (toRect.top + toRect.bottom) / 2;
+
+    // Determine side: auto-pick left/right based on horizontal position
+    // If source table is left of target → source-right → target-left
+    // If source table is right of target → source-left → target-right
+    const fromCx = (fromRect.left + fromRect.right) / 2;
+    const toCx   = (toRect.left + toRect.right) / 2;
+    const srcLeft = fromCx < toCx;
+
+    const fromX = srcLeft ? fromRect.right : fromRect.left;
+    const toX   = srcLeft ? toRect.left : toRect.right;
+
+    // Offset the anchor slightly inward for a cleaner look
+    const fromAnchor = { x: fromX + (srcLeft ? -4 : 4), y: fromY };
+    const toAnchor   = { x: toX + (srcLeft ? 4 : -4), y: toY };
 
     const relFrom = {
       x: (fromAnchor.x - canvasRect.left - schemaPanX) / schemaZoom,
@@ -718,15 +739,17 @@ function drawConnections(refs, elements) {
       y: (toAnchor.y - canvasRect.top - schemaPanY) / schemaZoom,
     };
 
-    // SVG viewBox is the same as container size — use relative coords
-    const cpx = Math.abs(relTo.x - relFrom.x) * 0.5;
+    // Bezier curve — control points extend horizontally
+    const cpx = Math.max(30, Math.abs(relTo.x - relFrom.x) * 0.5);
 
-    const d = `M ${relFrom.x} ${relFrom.y} C ${relFrom.x + cpx} ${relFrom.y}, ${relTo.x - cpx} ${relTo.y}, ${relTo.x} ${relTo.y}`;
+    // Control points must always point toward the other table
+    const d = srcLeft
+      ? `M ${relFrom.x} ${relFrom.y} C ${relFrom.x + cpx} ${relFrom.y}, ${relTo.x - cpx} ${relTo.y}, ${relTo.x} ${relTo.y}`
+      : `M ${relFrom.x} ${relFrom.y} C ${relFrom.x - cpx} ${relFrom.y}, ${relTo.x + cpx} ${relTo.y}, ${relTo.x} ${relTo.y}`;
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
     path.classList.add('connection-line');
-    // Highlight ref column name in tooltip
     path.innerHTML = `<title>${ref.from.table}.${ref.from.column} → ${ref.to.table}.${ref.to.column}</title>`;
     svg.appendChild(path);
 
@@ -739,38 +762,6 @@ function drawConnections(refs, elements) {
     dot.setAttribute('opacity', '0.6');
     svg.appendChild(dot);
   }
-}
-
-function getEdgeAnchor(rect, targetCenter) {
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  const dx = targetCenter.x - cx;
-  const dy = targetCenter.y - cy;
-
-  if (dx === 0 && dy === 0) return { x: cx, y: cy + rect.height / 2 };
-
-  // Intersection of line from center to target with rectangle edge
-  const absDx = Math.abs(dx);
-  const absDy = Math.abs(dy);
-
-  let tx, ty;
-  if (absDx * rect.height > absDy * rect.width) {
-    // Hit left or right edge
-    const signX = dx > 0 ? 1 : -1;
-    tx = cx + signX * rect.width / 2;
-    ty = cy + (dy / absDx) * rect.width / 2;
-  } else {
-    // Hit top or bottom edge
-    const signY = dy > 0 ? 1 : -1;
-    tx = cx + (dx / absDy) * rect.height / 2;
-    ty = cy + signY * rect.height / 2;
-  }
-
-  // Clamp to rect bounds
-  return {
-    x: Math.max(rect.left, Math.min(rect.right, tx)),
-    y: Math.max(rect.top, Math.min(rect.bottom, ty)),
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -842,6 +833,10 @@ function parseAndRender() {
   }
 
   renderSchema(state.tables, state.refs);
+
+  // Restore viewport transform after schema is rendered
+  applySchemaTransform();
+  updateConnections();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -937,6 +932,17 @@ function applySchemaTransform() {
   dom.tablesContainer.style.transform = t;
   dom.connectionsSvg.style.transform = t;
   updateZoomIndicator();
+  debounceSaveViewport();
+}
+
+let viewportSaveTimer = null;
+function debounceSaveViewport() {
+  clearTimeout(viewportSaveTimer);
+  viewportSaveTimer = setTimeout(() => {
+    // Save positions (includes viewport via __viewport__)
+    // only if there's a file to save to
+    if (state.currentFilePath || isWeb) savePositions();
+  }, 300);
 }
 
 function updateZoomIndicator() {
@@ -1129,13 +1135,37 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Warn on exit if unsaved
-window.addEventListener('beforeunload', (e) => {
-  if (state.isDirty) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
+// Handle close with unsaved changes (Electron: via main process IPC)
+if (!isWeb && ipcRenderer) {
+  ipcRenderer.on('window-close-request', async () => {
+    if (state.isDirty) {
+      const choice = await ipcRenderer.invoke('app:confirm-close');
+      if (choice === 0) {
+        // Discard — close without saving
+        ipcRenderer.invoke('app:do-close');
+      } else if (choice === 2) {
+        // Save — save then close
+        await saveFile();
+        if (!state.isDirty) {
+          ipcRenderer.invoke('app:do-close');
+        }
+      }
+      // choice === 1 = Cancel — do nothing
+    } else {
+      ipcRenderer.invoke('app:do-close');
+    }
+  });
+}
+
+// Web mode: warn on exit via beforeunload
+if (isWeb) {
+  window.addEventListener('beforeunload', (e) => {
+    if (state.isDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+}
 
 // Connections redrawn automatically after zoom/pan transforms
 

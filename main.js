@@ -21,6 +21,12 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
 
+  // ── Handle close with unsaved changes ──────────────────────────────
+  mainWindow.on('close', (e) => {
+    e.preventDefault();
+    mainWindow.webContents.send('window-close-request');
+  });
+
   // Open DevTools in development
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
@@ -65,6 +71,24 @@ ipcMain.handle('dialog:saveFile', async (event, { content, filePath }) => {
 });
 
 // ── App ready ────────────────────────────────────────────────────────────────
+
+// ── IPC: confirm close with unsaved dialog ─────────────────────────────
+ipcMain.handle('app:confirm-close', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Discard', 'Cancel', 'Save'],
+    defaultId: 2,
+    cancelId: 1,
+    message: 'You have unsaved changes.',
+    detail: 'Do you want to save before closing?',
+  });
+  return result.response; // 0=Discard, 1=Cancel, 2=Save
+});
+
+ipcMain.handle('app:do-close', () => {
+  app.exit(0);
+});
+
 app.whenReady().then(() => {
   createWindow();
 
