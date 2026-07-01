@@ -1,9 +1,9 @@
 version: "3.9"
 
 services:
-  ui-db:
+  open-dbml:
     build: .
-    container_name: ui-db
+    container_name: open-dbml
     ports:
       - "7924:7924"
     volumes:

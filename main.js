@@ -11,7 +11,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0d1117',
-    title: 'ui-db — DBML Editor',
+    title: 'Open DBML — DBML Editor',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

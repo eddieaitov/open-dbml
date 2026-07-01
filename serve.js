@@ -1,5 +1,5 @@
 /**
- * serve.js — HTTP server для web-режима ui-db
+ * serve.js — HTTP server для web-режима Open DBML
  * Запуск: node serve.js [port]
  * Порт по умолчанию: 7924
  */
@@ -74,7 +74,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  🗄️  ui-db — web mode`);
+  console.log(`\n  🗄️  Open DBML — web mode`);
   console.log(`  ─────────────────────`);
   console.log(`  Local:   http://localhost:${PORT}`);
   console.log(`  Docker:  http://0.0.0.0:${PORT}\n`);

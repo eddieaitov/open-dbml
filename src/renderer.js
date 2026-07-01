@@ -160,7 +160,7 @@ function updateTitle() {
     || 'New File';
   const dirty = state.isDirty ? ' ●' : '';
   dom.fileLabel.textContent = `— ${name}${dirty}`;
-  document.title = `${name}${dirty} — ui-db`;
+  document.title = `${name}${dirty} — Open DBML`;
 }
 
 function markClean() {
@@ -189,7 +189,7 @@ function loadPositions() {
   state.positions = {};
   if (isWeb) {
     try {
-      const raw = localStorage.getItem('ui-db-positions');
+      const raw = localStorage.getItem('open-dbml-positions');
       if (raw) state.positions = JSON.parse(raw);
     } catch (_) {}
   } else {
@@ -206,7 +206,7 @@ function loadPositions() {
 function savePositions() {
   if (isWeb) {
     try {
-      localStorage.setItem('ui-db-positions', JSON.stringify(state.positions));
+      localStorage.setItem('open-dbml-positions', JSON.stringify(state.positions));
     } catch (_) {}
   } else {
     const p = positionsPath();
@@ -233,7 +233,7 @@ function removeSavedPosition(tableName) {
 }
 
 // ── App State (last file, recent files) ────────────────────────────
-const APP_STATE_FILE = '.ui-db-state.json';
+const APP_STATE_FILE = '.open-dbml-state.json';
 
 function appStatePath() {
   if (isWeb) return null;
@@ -242,7 +242,7 @@ function appStatePath() {
 
 function loadAppState() {
   if (isWeb) {
-    try { return JSON.parse(localStorage.getItem('ui-db-state') || '{}'); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem('open-dbml-state') || '{}'); } catch { return {}; }
   }
   const fp = appStatePath();
   try { if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf-8')); } catch {}
@@ -251,7 +251,7 @@ function loadAppState() {
 
 function saveAppState(data) {
   if (isWeb) {
-    try { localStorage.setItem('ui-db-state', JSON.stringify(data)); } catch {}
+    try { localStorage.setItem('open-dbml-state', JSON.stringify(data)); } catch {}
     return;
   }
   const fp = appStatePath();
@@ -1143,7 +1143,7 @@ window.addEventListener('resize', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Start with a basic example
-const DEFAULT_DBML = `// ui-db — DBML Schema Editor
+const DEFAULT_DBML = `// Open DBML — DBML Schema Editor
 // Drag tables on the right panel to arrange them visually
 // Positions are saved automatically
 

@@ -2,7 +2,7 @@
 
 help: ## Показать эту справку
 	@echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-	@echo '  ui-db — DBML Editor                  '
+	@echo '  Open DBML — DBML Editor              '
 	@echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 	@echo '  make install      npm install'
 	@echo '  make start        Запуск Electron (десктоп)'

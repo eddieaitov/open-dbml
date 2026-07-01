@@ -1,4 +1,4 @@
-# ui-db
+# open-dbml
 
 Визуальный редактор схем баз данных для файлов **DBML**.
 
@@ -41,7 +41,7 @@ node serve.js
 
 ## Формат файлов
 
-ui-db работает с файлами `.dbml` (Database Markup Language).
+Open DBML работает с файлами `.dbml` (Database Markup Language).
 
 Позиции и цвета таблиц сохраняются в файл `<имя>.dbml.positions.json` рядом с DBML-файлом.
 
@@ -64,6 +64,17 @@ node serve.js
 # или make web
 ```
 
+## Сборка .app
+
+Готовый установщик для macOS (DMG):
+
+```bash
+make build-app   # сборка .app в release/
+make dmg         # сборка DMG-установщика
+```
+
+После `make dmg` откройте `release/Open-DBML-1.0.0-arm64.dmg` и перетащите `Open DBML.app` в `Applications`.
+
 ## Docker
 
 ```bash
@@ -81,10 +92,12 @@ make docker-down    # остановка
 | `make install` | `npm install` |
 | `make start` | Electron (десктоп) |
 | `make web` | Веб-сервер (http://localhost:7924) |
+| `make build-app` | Сборка `.app` в `release/` |
+| `make dmg` | Сборка DMG-установщика |
 | `make docker-build` | Сборка Docker-образа |
 | `make docker-up` | Запуск в Docker |
 | `make docker-down` | Остановка Docker |
-| `make clean` | Удаление `node_modules` |
+| `make clean` | Удаление `node_modules` и артефактов сборки |
 
 ## Технологии
 

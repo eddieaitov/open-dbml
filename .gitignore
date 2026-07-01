@@ -38,4 +38,4 @@ electron-builder.yml
 *.positions.json
 
 # App state (last file, recent files)
-.ui-db-state.json
+.open-dbml-state.json

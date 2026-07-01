@@ -7,9 +7,9 @@ const path = require('path');
 const fs = require('fs');
 
 const ROOT = path.resolve(__dirname, '..');
-const APP_DIR = path.join(ROOT, 'release', 'ui-db-darwin-arm64');
-const APP_BUNDLE = path.join(APP_DIR, 'ui-db.app');
-const DMG_NAME = 'ui-db-1.0.0-arm64.dmg';
+const APP_DIR = path.join(ROOT, 'release', 'Open DBML-darwin-arm64');
+const APP_BUNDLE = path.join(APP_DIR, 'Open DBML.app');
+const DMG_NAME = 'Open-DBML-1.0.0-arm64.dmg';
 const DMG_OUT = path.join(ROOT, 'release', DMG_NAME);
 const STAGING = path.join(ROOT, 'release', '_dmg-staging');
 
@@ -24,7 +24,7 @@ fs.mkdirSync(STAGING, { recursive: true });
 
 // Copy .app into staging
 console.log('  Copying app bundle...');
-execSync(`cp -R "${APP_BUNDLE}" "${STAGING}/ui-db.app"`, { cwd: ROOT });
+execSync(`cp -R "${APP_BUNDLE}" "${STAGING}/Open DBML.app"`, { cwd: ROOT });
 
 // Symlink to /Applications
 const appLink = path.join(STAGING, 'Applications');
@@ -36,7 +36,7 @@ if (fs.existsSync(DMG_OUT)) fs.unlinkSync(DMG_OUT);
 // Create DMG
 console.log('  Creating DMG...');
 execSync(
-  `hdiutil create -volname "ui-db" -srcfolder "${STAGING}" -ov -format UDZO "${DMG_OUT}"`,
+  `hdiutil create -volname "Open DBML" -srcfolder "${STAGING}" -ov -format UDZO "${DMG_OUT}"`,
   { cwd: ROOT, stdio: 'inherit' }
 );
 
