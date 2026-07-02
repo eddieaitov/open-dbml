@@ -381,29 +381,85 @@ function parseDBML(text) {
   // ── Remove comments ────────────────────────────────────────────────
   const clean = text.replace(/\/\/.*$/gm, '');
 
-  // ── Match table blocks ─────────────────────────────────────────────
-  const tableBlockRe = /Table\s+(\w[\w"]*)\s*\{([^}]*)\}/gi;
+  // ── Extract table bodies with brace counting ────────────────────────
+  // First, find all Table declarations with their opening brace
+  const tableStartRe = /Table\s+(\w[\w"]*)\s*\{/gi;
   let match;
-  while ((match = tableBlockRe.exec(clean)) !== null) {
-    const tableName = match[1].replace(/"/g, '');
-    const body = match[2];
-    const columns = [];
+  const tableBodies = [];
 
-    const lines = body.split('\n');
-    for (const raw of lines) {
+  while ((match = tableStartRe.exec(clean)) !== null) {
+    const tableName = match[1].replace(/"/g, '');
+    const start = match.index + match[0].length; // position after opening {
+    // Count braces to find the matching closing }
+    let depth = 1;
+    let pos = start;
+    while (depth > 0 && pos < clean.length) {
+      if (clean[pos] === '{') depth++;
+      else if (clean[pos] === '}') depth--;
+      pos++;
+    }
+    const body = clean.slice(start, pos - 1);
+    tableBodies.push({ name: tableName, body });
+  }
+
+  // ── Parse each table body ───────────────────────────────────────────
+  for (const { name: tableName, body } of tableBodies) {
+    const columns = [];
+    const indexes = [];
+
+    // Remove Indexes { ... } blocks from the body before column parsing
+    let colBody = body;
+    const indexBlockRe = /\bIndexes\s*\{/gi;
+    let idxMatch;
+    while ((idxMatch = indexBlockRe.exec(body)) !== null) {
+      const iStart = idxMatch.index + idxMatch[0].length;
+      let iDepth = 1;
+      let iPos = iStart;
+      while (iDepth > 0 && iPos < body.length) {
+        if (body[iPos] === '{') iDepth++;
+        else if (body[iPos] === '}') iDepth--;
+        iPos++;
+      }
+      const idxContent = body.slice(iStart, iPos - 1);
+      // Extract columns included in this index
+      const idxCols = [];
+      const colRefRe = /\(([^)]+)\)/g;
+      let crm;
+      while ((crm = colRefRe.exec(idxContent)) !== null) {
+        idxCols.push(crm[1].split(',').map(s => s.trim()));
+      }
+      // Extract index settings (after the parenthesized column list)
+      const settingsRe = /\)\s*\[([^\]]*)\]/;
+      const sm = idxContent.match(settingsRe);
+      const idxSettings = sm ? sm[1] : '';
+
+      indexes.push({
+        columns: idxCols.flat(),
+        unique: /\bunique\b/i.test(idxSettings),
+        name: (idxSettings.match(/name:\s*'([^']+)'/i) || [])[1] || null,
+        type: (idxSettings.match(/type:\s*(\w+)/i) || [])[1] || null,
+      });
+
+      // Remove the Indexes block from column body
+      const blockEnd = iPos;
+      colBody = colBody.slice(0, idxMatch.index) + colBody.slice(blockEnd);
+    }
+
+    // ── Parse columns from the remaining body ─────────────────────────
+    const colLines = colBody.split('\n');
+    for (const raw of colLines) {
       const line = raw.trim();
-      if (!line || line.startsWith('//') || line.startsWith('Note') || line.startsWith('note')) {
+      if (!line || line.startsWith('//') || line.startsWith('Note') || line.startsWith('note') || line.startsWith('Indexes') || line.startsWith('(')) {
         continue;
       }
 
-      // Match: colName type [settings]
       const colRe = /^(\w[\w"]*)\s+([^\s\[\]]+)(?:\s+\[([^\]]*)\])?/;
       const cm = line.match(colRe);
       if (!cm) continue;
 
       const colName = cm[1].replace(/"/g, '');
       const colType = cm[2];
-      const settings = (cm[3] || '').toLowerCase() + ' ' + (cm[3] || ''); // double for both-case checks
+      const settings = (cm[3] || '').toLowerCase() + ' ' + (cm[3] || '');
 
       const col = {
         name: colName,
@@ -429,7 +485,7 @@ function parseDBML(text) {
       columns.push(col);
     }
 
-    tables[tableName] = { name: tableName, columns, colMap: {} };
+    tables[tableName] = { name: tableName, columns, colMap: {}, indexes };
     // Build column lookup
     for (const col of columns) {
       tables[tableName].colMap[col.name] = col;
